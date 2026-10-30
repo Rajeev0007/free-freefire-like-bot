@@ -37,28 +37,31 @@ Includes advanced features like channel restrictions, cooldowns, JSON config, an
 
 ## 🧰 Requirements
 
-- Python 3.8+
-- A Discord bot token
+- Python 3.10+
+- A Discord bot token with **Message Content Intent** enabled (Developer Portal → Bot → Privileged Gateway Intents)
 - A RapidAPI key **or** a self-hosted API server
 - A `.env` file containing:
 
 ```ini
 TOKEN=your_discord_bot_token
 RAPIDAPI_KEY=your_rapidapi_key_or_custom_api_key
+# Optional: use your own API instead of RapidAPI
+# API_HOST=http://localhost:5000
  ```
 
 ## Installation
 
 1. Clone this repository:
    ```sh
-   git clone https://github.com/paulafredo/free-freefire-like-bot
+   git clone https://github.com/Rajeev0007/free-freefire-like-bot
    cd free-freefire-like-bot
    ```
 2. Create and activate a virtual environment:
    ```sh
    python -m venv .venv
    source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
-   
+   ```
+
 3. Install dependencies:
    ```sh
    pip install -r requirements.txt
@@ -95,6 +98,7 @@ RAPIDAPI_KEY=your_rapidapi_key_or_custom_api_key
 2. Click **"New Application"**, and give your bot a name.
 3. In the left sidebar, go to the **"Bot"** section and click **"Add Bot"**, then confirm with **"Yes, do it!"**.
 4. Under the **Token** section, click **"Reset Token"** or **"Copy"** to get your `TOKEN`.
+   On the same page, turn on **Message Content Intent** (needed for `!like`). Without it the bot cannot log in.
 5. Go to **"General Information"** and copy the `APPLICATION_ID`.
 6. Paste both values into your `.env` file:
       ```ini
@@ -123,19 +127,10 @@ RAPIDAPI_KEY=your_key_here
 ### ✅ Option 2: Use Your Own Api 
 
 1. Host your own version of the API: [Free Fire Like api](https://github.com/paulafredo/free-api-like-freefire).
-2. In the bot code (cogs/likeCommands.py), replace:
+2. Set `API_HOST` in your `.env` file and leave `RAPIDAPI_KEY` empty:
 
-```
-self.api_host = https://free-fire-like1.p.rapidapi.com 
-```
- with:
-
-```
-self.api_host = "http://localhost:5000"  # or your public server URL
-```
-3. Leave RAPIDAPI_KEY empty in .env:
-
-```
+```ini
+API_HOST=http://localhost:5000  # or your public server URL
 RAPIDAPI_KEY=
 ```
 
