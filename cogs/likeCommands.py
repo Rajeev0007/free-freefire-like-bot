@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urlparse
 
 import aiohttp
@@ -13,6 +14,8 @@ DEFAULT_API_HOST = "https://free-fire-like1.p.rapidapi.com"
 # Store the config next to app.py, regardless of the directory the bot is started from.
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "like_channels.json")
 COOLDOWN_SECONDS = 30
+# Regions accepted by the self-hosted API (https://github.com/paulafredo/free-fire-like-api).
+REGIONS = ["IND", "BR", "US", "SAC", "NA", "BD", "SG", "ME", "PK", "ID", "TH", "VN", "TW", "RU", "EU"]
 
 
 class LikeCommands(commands.Cog):
@@ -20,6 +23,12 @@ class LikeCommands(commands.Cog):
         self.bot = bot
         # Set API_HOST in .env to use your own API (e.g. http://localhost:5000).
         self.api_host = (os.getenv("API_HOST") or DEFAULT_API_HOST).rstrip("/")
+        # The self-hosted API needs a region ("server"). DEFAULT_REGION is used when the user gives none.
+        # RapidAPI keeps its original behavior (no region sent unless the user types one).
+        self.default_region = ""
+        if self.api_host != DEFAULT_API_HOST:
+            self.default_region = (os.getenv("DEFAULT_REGION") or "IND").strip().upper()
+            print(f"ℹ Using your own API at {self.api_host} (default region: {self.default_region})")
         self.config_data = self.load_config()
         self.cooldowns = {}
 
@@ -85,9 +94,17 @@ class LikeCommands(commands.Cog):
             await ctx.send(f"✅ Channel {channel.mention} is now **allowed** for /like commands. The command will **only** work in specified channels if any are set.", ephemeral=True)
 
     @commands.hybrid_command(name="like", description="Sends likes to a Free Fire player")
-    @app_commands.describe(uid="Player UID (numbers only, minimum 6 characters)")
-    async def like_command(self, ctx: commands.Context, uid: str):
+    @app_commands.describe(
+        uid="Player UID (numbers only, minimum 6 characters)",
+        region="Player's server, e.g. IND, BR, US, BD (optional)",
+    )
+    async def like_command(self, ctx: commands.Context, uid: str, region: Optional[str] = None):
         is_slash = ctx.interaction is not None
+
+        region = (region or self.default_region).strip().upper()
+        if region and region not in REGIONS:
+            await ctx.reply(f"Unknown region `{region}`. Use one of: {', '.join(REGIONS)}", mention_author=False, ephemeral=True)
+            return
 
         if not await self.check_channel(ctx):
             msg = "This command is not available in this channel. Please use it in an authorized channel."
@@ -111,10 +128,10 @@ class LikeCommands(commands.Cog):
             if is_slash:
                 # Acknowledge within Discord's 3 second limit; all later replies stay private.
                 await ctx.defer(ephemeral=True)
-                await self._request_likes(ctx, uid, is_slash)
+                await self._request_likes(ctx, uid, region, is_slash)
             else:
                 async with ctx.typing():
-                    await self._request_likes(ctx, uid, is_slash)
+                    await self._request_likes(ctx, uid, region, is_slash)
         except asyncio.TimeoutError:
             await self._send_error_embed(ctx, "Timeout", "The server took too long to respond.", ephemeral=is_slash)
         except aiohttp.ClientError as e:
@@ -124,16 +141,27 @@ class LikeCommands(commands.Cog):
             print(f"Unexpected error in like_command: {e}")
             await self._send_error_embed(ctx, "⚡ Critical Error", "An unexpected error occurred. Please try again later.", ephemeral=is_slash)
 
-    async def _request_likes(self, ctx: commands.Context, uid: str, is_slash: bool):
-        async with self.session.get(f"{self.api_host}/like", params={"uid": uid}, headers=self.headers) as response:
-            if response.status == 404:
-                await self._send_player_not_found(ctx, uid)
-                return
+    @like_command.autocomplete("region")
+    async def region_autocomplete(self, interaction: discord.Interaction, current: str):
+        current = current.upper()
+        return [app_commands.Choice(name=r, value=r) for r in REGIONS if r.startswith(current)][:25]
+
+    async def _request_likes(self, ctx: commands.Context, uid: str, region: str, is_slash: bool):
+        params = {"uid": uid}
+        if region:
+            params["server"] = region
+
+        async with self.session.get(f"{self.api_host}/like", params=params, headers=self.headers) as response:
             if response.status == 429:
                 await self._send_api_limit_reached(ctx)
                 return
             if response.status != 200:
-                print(f"API Error: {response.status} - {await response.text()}")
+                body = await response.text()
+                # The self-hosted API answers 500 {"error": "Player not found"} instead of 404.
+                if response.status == 404 or "not found" in body.lower():
+                    await self._send_player_not_found(ctx, uid)
+                    return
+                print(f"API Error: {response.status} - {body}")
                 await self._send_api_error(ctx)
                 return
 

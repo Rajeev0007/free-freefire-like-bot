@@ -69,10 +69,9 @@ RAPIDAPI_KEY=your_rapidapi_key_or_custom_api_key
 
 
 
-4. Create a `.env` file in the root directory and add your credentials:
-   ```ini
-   TOKEN=your_discord_bot_token
-   RAPIDAPI_KEY= your_rapidapi_key_or_empty_if_custom 
+4. Copy `.env.example` to `.env` and fill it in:
+   ```sh
+   cp .env.example .env      # Windows: copy .env.example .env
    ```
 
 5. Run the bot:
@@ -86,7 +85,7 @@ RAPIDAPI_KEY=your_rapidapi_key_or_custom_api_key
 
 ## Usage
 
-- Use `/like <user_id>` in a Discord server where the bot is present.
+- Use `/like <user_id> [region]` in a Discord server where the bot is present. The region is optional (default comes from `DEFAULT_REGION`).
 - Use `/setlikechannel <channel>`  to toggle allowed channels for the like command.
 
     
@@ -124,15 +123,47 @@ RAPIDAPI_KEY=your_key_here
 ```
 
 
-### ✅ Option 2: Use Your Own Api 
+### ✅ Option 2: Use Your Own API
 
-1. Host your own version of the API: [Free Fire Like api](https://github.com/paulafredo/free-api-like-freefire).
-2. Set `API_HOST` in your `.env` file and leave `RAPIDAPI_KEY` empty:
+**1. Download and install the API** (in a separate folder from the bot):
+
+```sh
+git clone https://github.com/paulafredo/free-fire-like-api
+cd free-fire-like-api
+pip install -r requirements.txt
+```
+
+**2. Add fresh tokens.** The token files in `tokens/` expired in August 2025, so replace them with tokens from Free Fire guest accounts you own:
+
+| Region | File |
+|--------|------|
+| IND | `tokens/token_ind.json` |
+| BR, US, SAC, NA | `tokens/token_br.json` |
+| Everything else | `tokens/token_bd.json` |
+
+Each file looks like `[{"token": "eyJ..."}, {"token": "eyJ..."}]`. Tokens expire, so you will need to replace them from time to time. The author's tutorials are linked in that repo's README.
+
+**3. Start the API:**
+
+```sh
+python app.py
+```
+
+Check it works by opening `http://127.0.0.1:5000/like?uid=YOUR_UID&server=IND` in your browser.
+
+**4. Point the bot at it** in the bot's `.env`:
 
 ```ini
-API_HOST=http://localhost:5000  # or your public server URL
+API_HOST=http://127.0.0.1:5000
 RAPIDAPI_KEY=
+DEFAULT_REGION=IND
 ```
+
+Users can then run `/like 123456789` (uses `DEFAULT_REGION`) or `/like 123456789 BR`.
+
+If the API suddenly stops working after a Free Fire update, change `"ReleaseVersion": "OB51"` in its `app.py` to the new game version.
+
+> ⚠ This sends likes through Free Fire's game servers using many accounts. That breaks Garena's terms of service, and the accounts you use can be banned.
 
 ## Example Output
 ![image](https://github.com/user-attachments/assets/de73e78c-cb1b-4ce4-8795-474ba685fa06)
